@@ -1,0 +1,702 @@
+#VideoDownloader para GOOGLE COLAB (si usas mi repo porfavor dale estrellita en; https://github.com/viajatech/VideoDownloaderColab
+
+# @title 🎬 Video Downloader by Viaja Tech { display-mode: "form" }
+
+# Configuración de GPU automática
+try:
+    import torch
+    print("⚙️ Verificando disponibilidad de GPU...")
+    if torch.cuda.is_available():
+        device_count = torch.cuda.device_count()
+        print(f"✅ GPU disponible: {torch.cuda.get_device_name(0)}")
+        print(f"   Total GPU(s): {device_count}")
+        for i in range(device_count):
+            print(f"   - GPU {i}: {torch.cuda.get_device_name(i)}")
+    else:
+        print("⚠️ No hay GPU disponible. Intentando activar...")
+        from google.colab import runtime
+        runtime.change_runtime(runtime_type="accelerator")
+        print("✅ Solicitud de GPU enviada. Si está disponible, se activará.")
+except Exception as e:
+    print(f"⚠️ No se pudo configurar GPU: {str(e)}")
+    print("   Se usará CPU para el procesamiento.")
+
+# Instalación de dependencias
+!pip install -q yt-dlp ipywidgets
+
+import os
+import sys
+import time
+import json
+import glob
+import threading
+import shutil
+import subprocess
+from IPython.display import display, HTML, clear_output
+import ipywidgets as widgets
+from google.colab import drive, files
+
+# Montar Google Drive
+drive_mounted = False
+drive_root = '/content/drive'
+download_base_dir = '/content/downloads'
+download_dir = download_base_dir  # Directorio actual para descargas
+
+try:
+    drive.mount(drive_root)
+    drive_mounted = True
+    # Crear un directorio en Google Drive para las descargas si no existe
+    my_drive_root = f"{drive_root}/MyDrive"
+    default_download_dir = f"{my_drive_root}/VideoDownloader"
+    if not os.path.exists(default_download_dir):
+        os.makedirs(default_download_dir, exist_ok=True)
+    download_dir = default_download_dir
+    print(f"✅ Google Drive montado. Directorio de descarga: {download_dir}")
+except Exception as e:
+    print(f"⚠️ No se pudo montar Google Drive: {str(e)}")
+    print(f"   Se usará directorio local: {download_base_dir}")
+    os.makedirs(download_base_dir, exist_ok=True)
+
+# Verificar FFmpeg
+try:
+    subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    print("✅ FFmpeg ya está instalado")
+except Exception as e:
+    print("⚠️ Instalando FFmpeg...")
+    !apt-get update -qq && apt-get install -qq ffmpeg
+    print("✅ FFmpeg instalado correctamente")
+
+# Crear widgets para la interfaz de usuario
+url_input = widgets.Text(
+    value='',
+    description='URL del video:',
+    placeholder='https://www.youtube.com/watch?v=...',
+    layout=widgets.Layout(width='95%')
+)
+
+format_type = widgets.Dropdown(
+    options=[('Video', 'video'), ('Solo Audio', 'audio')],
+    value='video',
+    description='Tipo de descarga:',
+    layout=widgets.Layout(width='95%')
+)
+
+video_format = widgets.Dropdown(
+    options=[('MP4', 'mp4'), ('MKV', 'mkv'), ('WebM', 'webm'), ('AVI', 'avi')],
+    value='mp4',
+    description='Formato de video:',
+    layout=widgets.Layout(width='95%')
+)
+
+audio_format = widgets.Dropdown(
+    options=[('MP3', 'mp3'), ('M4A', 'm4a'), ('WAV', 'wav'), ('FLAC', 'flac')],
+    value='mp3',
+    description='Formato de audio:',
+    layout=widgets.Layout(width='95%'),
+    disabled=True,  # Se habilita solo cuando se selecciona 'audio'
+)
+
+quality = widgets.Dropdown(
+    options=[
+        ('Mejor Calidad', 'best'),
+        ('4K (2160p)', 'bestvideo[height<=2160]+bestaudio/best[height<=2160]'),
+        ('Full HD (1080p)', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]'),
+        ('HD (720p)', 'bestvideo[height<=720]+bestaudio/best[height<=720]'),
+        ('SD (480p)', 'bestvideo[height<=480]+bestaudio/best[height<=480]'),
+        ('LD (360p)', 'bestvideo[height<=360]+bestaudio/best[height<=360]')
+    ],
+    value='best',
+    description='Calidad:',
+    layout=widgets.Layout(width='95%')
+)
+
+playlist_checkbox = widgets.Checkbox(
+    value=False,
+    description='Descargar lista completa (playlist)',
+    layout=widgets.Layout(width='95%')
+)
+
+# Selector de carpeta para Google Drive
+drive_folder_input = widgets.Text(
+    value=download_dir if drive_mounted else '',
+    description='Carpeta de destino:',
+    placeholder='Ruta en Google Drive donde guardar los archivos',
+    layout=widgets.Layout(width='80%'),
+    disabled=not drive_mounted
+)
+
+create_folder_button = widgets.Button(
+    description='Crear carpeta',
+    button_style='info',
+    layout=widgets.Layout(width='auto'),
+    disabled=not drive_mounted
+)
+
+# Área para mostrar los logs
+log_output = widgets.Output(
+    layout=widgets.Layout(height='250px', border='1px solid #ddd', overflow_y='auto')
+)
+
+# Barra de progreso
+progress_bar = widgets.FloatProgress(
+    value=0,
+    min=0,
+    max=100,
+    description='Progreso:',
+    bar_style='info',
+    orientation='horizontal',
+    layout=widgets.Layout(width='95%', height='30px')
+)
+
+status_label = widgets.Label(value='Listo para descargar')
+
+# Botones de acción
+download_button = widgets.Button(
+    description='🔽 Descargar Ahora',
+    button_style='primary',
+    layout=widgets.Layout(width='180px', height='38px')
+)
+
+info_button = widgets.Button(
+    description='ℹ️ Info del Video',
+    button_style='info', 
+    layout=widgets.Layout(width='180px', height='38px')
+)
+
+cancel_button = widgets.Button(
+    description='❌ Cancelar',
+    button_style='danger',
+    layout=widgets.Layout(width='120px', height='38px'),
+    disabled=True
+)
+
+download_to_pc_button = widgets.Button(
+    description='💻 Descargar a PC',
+    button_style='success',
+    layout=widgets.Layout(width='180px', height='38px'),
+    disabled=True
+)
+
+# Función para cambiar entre formatos de video y audio
+def on_format_change(change):
+    if change['new'] == 'video':
+        video_format.disabled = False
+        audio_format.disabled = True
+        quality.disabled = False
+    else:
+        video_format.disabled = True
+        audio_format.disabled = False
+        quality.disabled = True
+
+format_type.observe(on_format_change, names='value')
+
+# Variables globales para control
+current_process = {'thread': None, 'cancel': False}
+downloaded_files = []
+
+# Función para mostrar logs
+def log(message, error=False, clear=False):
+    with log_output:
+        if clear:
+            clear_output()
+        timestamp = time.strftime('%H:%M:%S')
+        color = "#cc0000" if error else "#000000"
+        print(f"<span style='color:{color}'>[{timestamp}] {message}</span>")
+        display(HTML(f"<script>element.scrollTop = element.scrollHeight;</script>"))
+
+# Función para actualizar el estado
+def update_status(message, progress=None):
+    status_label.value = message
+    if progress is not None and 0 <= progress <= 100:
+        progress_bar.value = progress
+
+# Función para verificar si la carpeta de destino existe
+def check_destination_folder():
+    folder = drive_folder_input.value.strip()
+    if not folder:
+        folder = download_dir
+    
+    if not os.path.exists(folder):
+        try:
+            os.makedirs(folder, exist_ok=True)
+            log(f"✅ Carpeta creada: {folder}")
+        except Exception as e:
+            log(f"❌ Error al crear carpeta: {str(e)}", error=True)
+            return None
+    
+    return folder
+
+# Función para crear nueva carpeta
+def create_folder(b):
+    current_folder = drive_folder_input.value
+    folder_name = input("Ingrese el nombre de la nueva carpeta: ")
+    
+    if current_folder and folder_name:
+        new_folder = os.path.join(current_folder, folder_name)
+        try:
+            os.makedirs(new_folder, exist_ok=True)
+            drive_folder_input.value = new_folder
+            log(f"✅ Nueva carpeta creada: {new_folder}")
+        except Exception as e:
+            log(f"❌ Error al crear carpeta: {str(e)}", error=True)
+    else:
+        log("⚠️ Por favor especifique una ruta base y un nombre de carpeta", error=True)
+
+create_folder_button.on_click(create_folder)
+
+# Clase para monitorear el progreso de descarga
+class ProgressHook:
+    def __init__(self):
+        self.start_time = time.time()
+        self.last_update = 0
+        self.filename = ""
+        self.status = ""
+        
+    def __call__(self, d):
+        now = time.time()
+        
+        # Limitar actualizaciones para no sobrecargar la interfaz
+        if now - self.last_update < 0.5 and d['status'] == 'downloading':
+            return
+            
+        self.last_update = now
+        
+        if d['status'] == 'downloading':
+            self.filename = os.path.basename(d.get('filename', 'unknown'))
+            percent = d.get('_percent_str', '0%').strip()
+            speed = d.get('_speed_str', 'N/A')
+            eta = d.get('_eta_str', 'N/A')
+            
+            log(f"⏬ Descargando: {self.filename} - {percent} a {speed}, ETA: {eta}")
+            
+            try:
+                # Extraer el porcentaje como número
+                if percent.endswith('%'):
+                    percent_num = float(percent[:-1])
+                    update_status(f"Descargando: {percent} a {speed}, ETA: {eta}", percent_num)
+            except:
+                update_status(f"Descargando: {percent} a {speed}, ETA: {eta}")
+        
+        elif d['status'] == 'finished':
+            elapsed = time.time() - self.start_time
+            filename = os.path.basename(d.get('filename', 'archivo'))
+            log(f"✅ Descarga completa: {filename} en {elapsed:.1f} segundos")
+            update_status("Procesando archivo...", 95)
+
+# Obtener información del video
+def get_video_info(b):
+    url = url_input.value.strip()
+    if not url:
+        log("⚠️ Por favor ingresa una URL válida", error=True)
+        return
+    
+    log("🔍 Obteniendo información del video...", clear=True)
+    info_button.disabled = True
+    download_button.disabled = True
+    
+    def fetch_info():
+        try:
+            import yt_dlp
+            
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True
+            }
+            
+            if not playlist_checkbox.value:
+                ydl_opts['noplaylist'] = True
+                
+            # Extraer información pero no descargar
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                log("🔄 Conectando con el servidor...")
+                info = ydl.extract_info(url, download=False)
+                
+                if not info:
+                    log("❌ No se pudo obtener información del video", error=True)
+                    return
+                
+                log("✅ Información obtenida correctamente")
+                
+                # Verificar si es una playlist
+                if 'entries' in info:
+                    playlist_title = info.get('title', 'Playlist sin título')
+                    entries = list(info.get('entries', []))
+                    video_count = len(entries)
+                    
+                    log(f"📋 Playlist: {playlist_title}")
+                    log(f"📑 Contiene {video_count} videos")
+                    
+                    # Mostrar algunos videos de la lista
+                    for i, entry in enumerate(entries[:5], 1):
+                        if entry:
+                            title = entry.get('title', f'Video {i}')
+                            log(f"  {i}. {title}")
+                    
+                    if video_count > 5:
+                        log(f"  ... y {video_count - 5} videos más")
+                
+                else:
+                    # Información para video único
+                    title = info.get('title', 'Video sin título')
+                    channel = info.get('uploader', 'Canal desconocido')
+                    duration = info.get('duration', 0)
+                    
+                    # Formatear duración
+                    mins, secs = divmod(int(duration), 60)
+                    hrs, mins = divmod(mins, 60)
+                    
+                    duration_str = f"{mins}:{secs:02d}"
+                    if hrs > 0:
+                        duration_str = f"{hrs}:{mins:02d}:{secs:02d}"
+                    
+                    log(f"📹 Título: {title}")
+                    log(f"👤 Canal: {channel}")
+                    log(f"⏱️ Duración: {duration_str}")
+                    
+                    # Analizar formatos disponibles
+                    formats = info.get('formats', [])
+                    video_heights = set()
+                    audio_formats = set()
+                    
+                    for f in formats:
+                        if f.get('height'):
+                            video_heights.add(f.get('height'))
+                        elif f.get('acodec') != 'none' and f.get('vcodec') == 'none':
+                            audio_format_name = f.get('format_note', 'unknown')
+                            audio_formats.add(audio_format_name)
+                    
+                    # Mostrar resoluciones de video
+                    if video_heights:
+                        sorted_heights = sorted(video_heights, reverse=True)
+                        log(f"🔍 Resoluciones disponibles: {', '.join([f'{h}p' for h in sorted_heights])}")
+                        
+                        # Detectar calidad máxima
+                        max_height = max(sorted_heights)
+                        if max_height >= 2160:
+                            log("✨ ¡Calidad 4K disponible!")
+                        elif max_height >= 1440:
+                            log("✨ ¡Calidad 2K disponible!")
+                        elif max_height >= 1080:
+                            log("✨ ¡Calidad Full HD disponible!")
+                    
+                    # Mostrar formatos de audio
+                    if audio_formats:
+                        log(f"🎵 Formatos de audio: {', '.join(audio_formats)}")
+                
+                log("✅ El video puede ser descargado")
+        
+        except Exception as e:
+            log(f"❌ Error: {str(e)}", error=True)
+            import traceback
+            log(traceback.format_exc(), error=True)
+        finally:
+            info_button.disabled = False
+            download_button.disabled = False
+    
+    threading.Thread(target=fetch_info, daemon=True).start()
+
+# Función principal de descarga
+def download_video(b):
+    global downloaded_files
+    downloaded_files = []
+    
+    url = url_input.value.strip()
+    if not url:
+        log("⚠️ Por favor ingresa una URL válida", error=True)
+        return
+    
+    # Verificar carpeta de destino
+    save_dir = check_destination_folder()
+    if not save_dir:
+        log("❌ No se pudo acceder a la carpeta de destino", error=True)
+        return
+    
+    # Obtener las opciones seleccionadas
+    is_audio = format_type.value == 'audio'
+    selected_format = audio_format.value if is_audio else video_format.value
+    selected_quality = 'bestaudio/best' if is_audio else quality.value
+    download_playlist = playlist_checkbox.value
+    
+    # Preparar UI
+    download_button.disabled = True
+    info_button.disabled = True
+    cancel_button.disabled = False
+    download_to_pc_button.disabled = True
+    progress_bar.value = 0
+    
+    log(f"🚀 Iniciando descarga desde: {url}", clear=True)
+    log(f"📂 Carpeta de destino: {save_dir}")
+    log(f"📊 Modo: {'Audio' if is_audio else 'Video'}, Formato: {selected_format}")
+    
+    # Crear directorio temporal
+    temp_dir = f"/tmp/viaja_tech_download_{int(time.time())}"
+    os.makedirs(temp_dir, exist_ok=True)
+    log(f"📁 Carpeta temporal creada: {temp_dir}")
+    
+    # Configurar variable de control
+    current_process['cancel'] = False
+    
+    def perform_download():
+        global downloaded_files
+        try:
+            import yt_dlp
+            
+            # Obtener título para nombre de archivo
+            log("🔍 Obteniendo información básica...")
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                if 'entries' in info_dict:
+                    is_playlist_actual = True
+                    playlist_title = info_dict.get('title', 'playlist')
+                    safe_title = "".join([c if c.isalnum() or c in ' ._-' else '_' for c in playlist_title])
+                else:
+                    is_playlist_actual = False
+                    video_title = info_dict.get('title', 'video')
+                    safe_title = "".join([c if c.isalnum() or c in ' ._-' else '_' for c in video_title])
+            
+            # Configurar plantilla de salida
+            if is_playlist_actual and download_playlist:
+                output_template = os.path.join(temp_dir, f"{safe_title}_%(playlist_index)s.%(ext)s")
+                log(f"📋 Preparado para playlist: {safe_title}")
+            else:
+                output_template = os.path.join(temp_dir, f"{safe_title}.%(ext)s")
+                log(f"🎬 Preparado para video: {safe_title}")
+            
+            # Configurar opciones de descarga
+            progress_hook = ProgressHook()
+            
+            ydl_opts = {
+                'format': selected_quality,
+                'outtmpl': output_template,
+                'progress_hooks': [progress_hook],
+                'noplaylist': not download_playlist
+            }
+            
+            # Opciones específicas para audio o video
+            if is_audio:
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': selected_format,
+                    'preferredquality': '192',
+                }]
+            
+            # Descargar video/audio
+            log("⏬ Iniciando descarga con yt-dlp...")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            
+            # Verificar cancelación
+            if current_process['cancel']:
+                log("🛑 Descarga cancelada por el usuario")
+                update_status("Descarga cancelada", 0)
+                return
+            
+            # Buscar archivos descargados
+            temp_files = []
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if not file.endswith(('.part', '.ytdl', '.tmp')):
+                        temp_files.append(os.path.join(root, file))
+            
+            if not temp_files:
+                log("❌ No se encontraron archivos descargados", error=True)
+                update_status("Error: No se encontraron archivos", 0)
+                return
+            
+            log(f"✅ Descarga completada: {len(temp_files)} archivos")
+            
+            # Procesar archivos según el formato seleccionado
+            processed_files = []
+            
+            for file_path in temp_files:
+                update_status(f"Procesando: {os.path.basename(file_path)}...", 90)
+                base_name = os.path.basename(file_path)
+                ext = os.path.splitext(base_name)[1].lower()
+                
+                if is_audio:
+                    # Para audio, yt-dlp ya lo convirtió al formato correcto
+                    dest_file = os.path.join(save_dir, base_name)
+                    shutil.copy2(file_path, dest_file)
+                    processed_files.append(dest_file)
+                    log(f"📁 Guardado en Drive: {base_name}")
+                
+                else:
+                    # Para video, verificar si necesita conversión
+                    target_ext = f".{selected_format}"
+                    
+                    if ext == target_ext:
+                        dest_file = os.path.join(save_dir, base_name)
+                        shutil.copy2(file_path, dest_file)
+                        processed_files.append(dest_file)
+                        log(f"📁 Guardado en Drive: {base_name}")
+                    else:
+                        # Convertir al formato deseado
+                        new_name = os.path.splitext(base_name)[0] + target_ext
+                        dest_file = os.path.join(save_dir, new_name)
+                        
+                        log(f"🔄 Convirtiendo a {selected_format.upper()}: {base_name}")
+                        
+                        try:
+                            if selected_format == 'mp4':
+                                cmd = ['ffmpeg', '-i', file_path, '-c:v', 'libx264', '-preset', 'fast', 
+                                       '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', 
+                                       dest_file]
+                            elif selected_format == 'mkv':
+                                cmd = ['ffmpeg', '-i', file_path, '-c:v', 'libx264', '-preset', 'fast',
+                                       '-c:a', 'aac', dest_file]
+                            elif selected_format == 'webm':
+                                cmd = ['ffmpeg', '-i', file_path, '-c:v', 'libvpx-vp9', 
+                                       '-c:a', 'libopus', dest_file]
+                            else:
+                                cmd = ['ffmpeg', '-i', file_path, dest_file]
+                            
+                            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                            
+                            if result.returncode == 0 and os.path.exists(dest_file):
+                                processed_files.append(dest_file)
+                                log(f"✅ Convertido y guardado: {new_name}")
+                            else:
+                                # Si falla la conversión, copiar el archivo original
+                                fallback_dest = os.path.join(save_dir, base_name)
+                                shutil.copy2(file_path, fallback_dest)
+                                processed_files.append(fallback_dest)
+                                log(f"⚠️ Conversión fallida. Guardado original: {base_name}", error=True)
+                        except Exception as e:
+                            log(f"❌ Error en conversión: {str(e)}", error=True)
+                            # Guardar archivo original como respaldo
+                            fallback_dest = os.path.join(save_dir, base_name)
+                            shutil.copy2(file_path, fallback_dest)
+                            processed_files.append(fallback_dest)
+                            log(f"⚠️ Guardado archivo original: {base_name}", error=True)
+                
+            # Limpiar archivos temporales
+            try:
+                for file in temp_files:
+                    if os.path.exists(file):
+                        os.remove(file)
+                os.rmdir(temp_dir)
+                log("🧹 Archivos temporales limpiados")
+            except:
+                log("⚠️ Advertencia: No se pudieron eliminar algunos archivos temporales", error=True)
+            
+            # Completado
+            downloaded_files = processed_files
+            file_count = len(processed_files)
+            
+            update_status(f"✅ Descarga completa: {file_count} archivos", 100)
+            log(f"🎉 DESCARGA COMPLETADA: {file_count} archivos guardados en {save_dir}")
+            
+            # Mostrar lista de archivos
+            log("📋 Archivos descargados:")
+            for i, file_path in enumerate(processed_files, 1):
+                file_name = os.path.basename(file_path)
+                file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                log(f"  {i}. {file_name} ({file_size:.2f} MB)")
+            
+            # Habilitar botón de descarga a PC
+            download_to_pc_button.disabled = False
+            
+        except Exception as e:
+            log(f"❌ Error durante la descarga: {str(e)}", error=True)
+            import traceback
+            log(traceback.format_exc(), error=True)
+            update_status(f"Error: {str(e)}", 0)
+        finally:
+            download_button.disabled = False
+            info_button.disabled = False
+            cancel_button.disabled = True
+    
+    # Iniciar la descarga en un hilo separado
+    current_process['thread'] = threading.Thread(target=perform_download, daemon=True)
+    current_process['thread'].start()
+
+# Función para cancelar la descarga
+def cancel_download(b):
+    current_process['cancel'] = True
+    log("⚠️ Cancelando descarga... (esto puede tomar unos segundos)")
+    update_status("Cancelando...", None)
+
+# Función para descargar a PC local
+def download_to_pc(b):
+    if not downloaded_files:
+        log("⚠️ No hay archivos para descargar", error=True)
+        return
+    
+    log("📥 Preparando descarga a tu computadora...")
+    
+    for file_path in downloaded_files:
+        if os.path.exists(file_path):
+            file_name = os.path.basename(file_path)
+            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            
+            log(f"📦 Enviando {file_name} ({file_size_mb:.2f} MB) a tu navegador...")
+            try:
+                files.download(file_path)
+                log(f"✅ Archivo enviado: {file_name}")
+            except Exception as e:
+                log(f"❌ Error al enviar archivo: {str(e)}", error=True)
+    
+    log("✅ Todos los archivos han sido enviados a tu navegador")
+    log("💡 Si los archivos no se descargan automáticamente, revisa si tu navegador los bloqueó")
+
+# Asignar funciones a los botones
+info_button.on_click(get_video_info)
+download_button.on_click(download_video)
+cancel_button.on_click(cancel_download)
+download_to_pc_button.on_click(download_to_pc)
+
+# Crear la interfaz de usuario
+header = widgets.HTML('''
+<div style="background:#4285F4; color:white; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center">
+    <h2 style="margin:0">🎬 Video Downloader by Viaja Tech</h2>
+    <p style="margin:5px 0 0 0">Descarga videos y audio de YouTube y otras plataformas</p>
+</div>
+''')
+
+input_section = widgets.VBox([
+    url_input,
+    widgets.HBox([format_type, playlist_checkbox]),
+    widgets.HBox([video_format, audio_format]),
+    quality,
+    widgets.HBox([drive_folder_input, create_folder_button]),
+])
+
+buttons_section = widgets.HBox([
+    download_button, 
+    info_button, 
+    cancel_button,
+    download_to_pc_button
+])
+
+progress_section = widgets.VBox([
+    status_label,
+    progress_bar
+])
+
+# Crear tabs para organizar la interfaz
+tab = widgets.Tab()
+tab.children = [
+    widgets.VBox([input_section, buttons_section, progress_section]),
+    log_output
+]
+tab.set_title(0, '📥 Descargar')
+tab.set_title(1, '📋 Logs')
+
+# Mostrar interfaz completa
+app = widgets.VBox([header, tab])
+display(app)
+
+# Mensajes iniciales
+log("✅ Video Downloader inicializado", clear=True)
+log("✅ FFmpeg está instalado")
+log("📌 IMPORTANTE:")
+log("  1. Ingresa una URL y haz clic en 'Info del Video'")
+log("  2. Selecciona formato y calidad deseados")
+log("  3. El video se guardará primero en Google Drive")
+log("  4. Luego podrás descargarlo a tu PC con el botón 'Descargar a PC'")
+log("  5. Tu navegador te preguntará dónde guardar el archivo")
+
+if drive_mounted:
+    log(f"✅ Google Drive montado. Los videos se guardarán en: {download_dir}")
+else:
+    log("⚠️ Google Drive no está montado. Los videos se guardarán localmente.", error=True)

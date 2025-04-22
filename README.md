@@ -1,108 +1,127 @@
-🎬 Video Downloader para Google Colab
+```markdown
+<!-- README.md mejorado para Video Downloader Colab by ViajaTech -->
 
-✨ Descarga videos y audio de YouTube y otras plataformas con solo unos clics ✨
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viajatech/VideoDownloaderColab/blob/main/VideoDownloaderColab.ipynb) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-🚀 Características Principales
+# 🎬 Video Downloader Colab
+**Descarga multimedia al instante**
 
-📱 Fácil de usar: Interfaz gráfica intuitiva, sin necesidad de conocimientos técnicos
-🔋 Potencia de Google: Utiliza los servidores de Google para descargas rápidas
-📊 Múltiples calidades: Desde 360p hasta 4K, ¡tú eliges la resolución!
-🎵 Extracción de audio: Descarga solo el audio en formatos MP3, WAV, M4A y FLAC
-💾 Guarda donde quieras: Descarga directamente a tu Google Drive o a tu PC
-🎞️ Formatos variados: MP4, MKV, WebM y más
-📋 Soporte para listas: Descarga listas completas de reproducción
-🔍 Información detallada: Consulta todos los datos del video antes de descargar
-🌐 Múltiples plataformas: Compatible con YouTube, Facebook, Twitter, Vimeo y muchos más
+> Un notebook de Google Colab que aprovecha la potencia de yt-dlp para capturar videos y audio de YouTube y decenas de plataformas, sin instalar nada en tu máquina.
 
-🎮 ¿Cómo utilizar Video Downloader?
-Método Rápido (Recomendado)
+---
 
-Abre el Notebook en Google Colab: Haz clic en el botón Show Image
-Ejecuta la celda de código: Presiona el botón ▶️ (Play) o usa el atajo Ctrl+Enter
-¡Listo para usar! Aparecerá la interfaz del Video Downloader
+## 🚀 Características Destacadas
 
-Método Alternativo
+- 🔥 **Interfaz Intuitiva**: UI gráfica lista para usar, ideal para principiantes y pro-techs.
+- ⚡ **Rendimiento Google**: Aprovecha la infraestructura de Colab para descargas ultra-rápidas.
+- 📺 **Resoluciones Variadas**: Desde 360p hasta 4K (¡y 8K cuando esté disponible!).
+- 🎵 **Extracción de Audio**: Exporta pistas en MP3, WAV, M4A, FLAC y más.
+- 💾 **Guardado Flexible**: Descarga directo a Google Drive o tu PC.
+- 📂 **Soporte de Playlists**: Baja listas completas de reproducción con un clic.
+- 🌐 **Multi-Plataforma**: YouTube, Facebook, Twitter, Instagram, Vimeo, Dailymotion, SoundCloud y más.
+- 📊 **Detalles Previos**: Vista previa de metadatos: duración, formatos y bitrate.
 
-Ve a Google Colab
-Selecciona GitHub en la ventana de bienvenida
-Escribe viajatech/VideoDownloaderColab en el campo de búsqueda
-Selecciona el notebook VideoDownloaderColab.ipynb
-Ejecuta la celda con el botón ▶️
+---
 
-📝 Guía Paso a Paso
-1️⃣ Pega la URL del video
-Copia la dirección del video o playlist desde YouTube, Facebook, Twitter, etc. y pégala en el campo "URL del video"
-2️⃣ Obtén información (opcional)
-Haz clic en ℹ️ Info del Video para ver detalles como duración, calidades disponibles y formato
-3️⃣ Selecciona el tipo y formato
+## 🎮 Quickstart (¡en 3 pasos!)
 
-Tipo: Elige entre Video o Solo Audio
-Formato: Para videos, selecciona entre MP4, MKV, WebM; para audio, elige MP3, M4A, WAV, etc.
-Calidad: Desde "Mejor Calidad" hasta opciones específicas como 1080p, 720p, etc.
+1. **Abre Colab**
+   - Haz clic en el badge [![Colab](https://colab.research.google.com/assets/colab-badge.svg)]() o abre el notebook desde GitHub:   
+     ```bash
+     viajatech/VideoDownloaderColab
+     ```
+2. **Ejecuta todo**
+   - Presiona **▶️ Runtime > Run all** o usa Ctrl+F9.  
+   - La interfaz aparecerá automáticamente.
+3. **Disfruta y comparte**
+   - Pega la URL de tu video o playlist.
+   - Elige calidad, formato y destino (Drive o PC).
+   - Haz clic en **Descargar** y listo.
 
-4️⃣ Elige dónde guardar
+---
 
-La herramienta guarda primero en tu Google Drive
-Puedes seleccionar o crear cualquier carpeta en tu Drive
-Después, podrás descargar a tu computadora
+## 📝 Uso Detallado
 
-5️⃣ Inicia la descarga
-Presiona 🔽 Descargar Ahora y espera a que termine el proceso
-6️⃣ Descarga a tu computadora (opcional)
-Una vez completada la descarga a Drive, haz clic en 💻 Descargar a PC
+1️⃣ **Pegar URL**  
+   Ingresa la dirección del video o playlist en el campo "URL del video".
 
-Tu navegador te preguntará dónde guardar el archivo
-¡Selecciona la carpeta que prefieras en tu computadora!
+2️⃣ **Vista Previa (Opcional)**  
+   🔍 Clic en **Info del Video** para ver duración, calidad y formatos disponibles.
 
-📋 Preguntas Frecuentes
-❓ ¿Es legal usar este programa?
-Este programa está diseñado para descargar contenido para uso personal de plataformas que permiten esta acción. Respeta los derechos de autor y las leyes de tu país. No uses este programa para infringir derechos de autor.
-❓ ¿Por qué primero se guarda en Drive?
-Google Colab tiene limitaciones para descargar archivos directamente. El proceso de dos pasos (Drive → PC) permite:
+3️⃣ **Configurar Descarga**
+- **Tipo**: Video 🎥 o Solo Audio 🎧  
+- **Formato**: MP4, MKV, WebM (video) / MP3, M4A, WAV, FLAC (audio)  
+- **Calidad**: "Mejor Calidad", 1080p, 720p, etc.
 
-No perder la descarga si se cierra la pestaña
-Elegir exactamente dónde guardar en tu PC
-Mayor confiabilidad con archivos grandes
+4️⃣ **Seleccionar Destino**
+- **Google Drive**: El notebook montará tu `MyDrive/VideoDownloader/`
+- **PC Local**: Tras guardar en Drive, descarga con un clic.
 
-❓ ¿Necesito instalar algo?
-¡Absolutamente nada! Todo funciona en la nube de Google. Solo necesitas un navegador web y una cuenta de Google.
-❓ ¿Qué plataformas son compatibles?
+5️⃣ **Ejecutar Descarga**  
+   🔽 Haz clic en **Descargar Ahora** y observa el progreso en la consola.
 
-YouTube (videos y playlists)
-Facebook
-Twitter
-Instagram
-Vimeo
-Dailymotion
-SoundCloud
-Y muchas más...
+6️⃣ **Descargar a tu PC**  
+   💻 Clic en **Descargar a PC** cuando termine la tarea.
 
-❓ ¿Tiene algún costo?
-El script es completamente gratuito y de código abierto. Google Colab ofrece recursos limitados de forma gratuita que son más que suficientes para la mayoría de descargas.
-💡 Consejos Pro
+---
 
-🔄 Si la descarga es muy lenta, reinicia el runtime de Colab y vuelve a intentarlo
-🌟 Para videos largos, usa el formato MP4 que tiene mejor compatibilidad
-🎯 Si solo quieres la música, elige "Solo Audio" y formato MP3 para ahorrar espacio
-📱 Funciona en móviles también, pero la experiencia es mejor en PC
-🔋 Las sesiones de Colab expiran después de cierto tiempo de inactividad; no dejes descargas sin supervisar por horas
+## 💡 Tips y Trucos
 
-🛠️ Requisitos
+- 🔄 Si la velocidad baja, reinicia el runtime y prueba de nuevo.
+- 📱 Compatible en móviles, aunque recomendamos PC para mayor control.
+- 🗂️ Organiza tus descargas mediante subcarpetas en Drive.
+- ⌛ Colab expira tras 12 horas; guarda tus archivos antes de desconexiones.
 
-Cuenta de Google
-Navegador web (Chrome, Firefox, Edge, Safari)
-Conexión a Internet
+---
 
-📜 Licencia
-Este proyecto está licenciado bajo Apache License 2.0
-👏 Créditos y Agradecimientos
+## 📋 FAQ
 
-Desarrollado por Viaja Tech
-Utiliza yt-dlp para la extracción de videos
-Ejecutado en Google Colab
-Creado con ❤️ para la comunidad
+> **¿Es legal usar esta herramienta?**  
+> Diseñado para uso personal con contenido permitido. Respeta siempre derechos de autor.
 
+> **¿Por qué primero Drive?**  
+> Google Colab limita la descarga directa; Drive actúa como almacenamiento fiable.
 
-🌟 ¿Te gusta este proyecto? ¡Déjanos una estrella en GitHub! ⭐
-Si tienes sugerencias o encuentras algún problema, abre un issue en GitHub.
-¡Disfruta descargando tus videos favoritos! 🎉Add to Conversation
+> **¿Necesito instalar algo?**  
+> Nada: todo corre en la nube. Solo necesitas navegador y cuenta de Google.
+
+> **¿Tiene costo oculto?**  
+> Cero. Este proyecto es open source y gratuito.
+
+---
+
+## 🛠️ Requisitos
+
+- Cuenta de Google (Colab gratuito).
+- Navegador moderno: Chrome, Firefox, Edge o Safari.
+- Conexión a Internet estable.
+
+---
+
+## 📜 Licencia
+
+Este proyecto está bajo la [Apache License 2.0](https://opensource.org/licenses/Apache-2.0).
+
+---
+
+## 🙌 Contribuciones
+
+¡Todas las mejoras son bienvenidas!  
+1. Haz **fork**  
+2. Crea una **branch**  
+3. Envía tu **pull request**  
+
+Para ideas, issues o sugerencias, abre una nueva incidencia en GitHub.
+
+---
+
+## 👤 Autor
+
+Desarrollado con ❤️ por **ViajaTech**  
+GitHub: [@viajatech](https://github.com/viajatech)
+
+---
+
+*¡Disfruta tus descargas y lleva tu contenido a donde quieras!* 🎉
+```
+

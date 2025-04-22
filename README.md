@@ -1,5 +1,4 @@
-```markdown
-<!-- README.md mejorado para Video Downloader Colab by ViajaTech -->
+
 
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viajatech/VideoDownloaderColab/blob/main/VideoDownloaderColab.ipynb) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 

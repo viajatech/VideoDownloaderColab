@@ -2,8 +2,6 @@
 
 ✨ Descarga videos y audio de YouTube y otras plataformas con solo unos clics ✨
 
-Show Image
-Show Image
 🚀 Características Principales
 
 📱 Fácil de usar: Interfaz gráfica intuitiva, sin necesidad de conocimientos técnicos
